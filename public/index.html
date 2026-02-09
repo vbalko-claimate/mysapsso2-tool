@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MYSAPSSO2 Token Tool</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: 600; }
+    .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
+    .tab-inactive:hover { color: #374151; }
+    textarea { font-family: 'Menlo', 'Consolas', monospace; font-size: 0.85rem; }
+    .field-row:nth-child(even) { background-color: #f9fafb; }
+    .copy-btn { transition: all 0.15s; }
+    .copy-btn:active { transform: scale(0.95); }
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: #1f2937; color: #fff; padding: 0.5rem 1rem;
+      border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500;
+      opacity: 0; transform: translateY(0.5rem);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none; z-index: 50;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .help-section h3 { font-size: 1rem; font-weight: 600; color: #111827; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    .help-section h3:first-child { margin-top: 0; }
+    .help-section p { color: #4b5563; font-size: 0.875rem; line-height: 1.625; }
+    .help-section ul { list-style: disc; padding-left: 1.25rem; color: #4b5563; font-size: 0.875rem; line-height: 1.75; }
+    .help-section table { font-size: 0.8rem; }
+    .help-section code { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.8rem; }
+    .kbd { display: inline-block; padding: 0.1rem 0.4rem; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.75rem; font-family: inherit; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="toast" class="toast"></div>
+
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <header class="mb-8">
+      <h1 class="text-2xl font-bold text-gray-900">MYSAPSSO2 Token Tool</h1>
+      <p class="text-gray-500 mt-1">Decode and encode SAP SSO2 logon tickets</p>
+    </header>
+
+    <!-- Tabs -->
+    <div class="flex space-x-6 border-b border-gray-200 mb-6">
+      <button id="tab-decode" class="pb-2 px-1 text-sm tab-active" onclick="switchTab('decode')">Decode</button>
+      <button id="tab-encode" class="pb-2 px-1 text-sm tab-inactive" onclick="switchTab('encode')">Encode</button>
+      <button id="tab-help" class="pb-2 px-1 text-sm tab-inactive" onclick="switchTab('help')">Help</button>
+    </div>
+
+    <!-- Decode Panel -->
+    <div id="panel-decode">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Base64 Token</label>
+        <textarea id="decode-input" rows="5" class="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Paste MYSAPSSO2 base64 token here..."></textarea>
+        <div class="mt-3 flex items-center space-x-3">
+          <button onclick="doDecode()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">Decode Token</button>
+          <button onclick="loadExample()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium">Load Example</button>
+          <span class="text-xs text-gray-400"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> to submit</span>
+        </div>
+      </div>
+
+      <div id="decode-error" class="hidden mt-4 bg-red-50 border border-red-200 text-red-700 rounded-md p-4 text-sm"></div>
+
+      <div id="decode-result" class="hidden mt-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="font-semibold text-gray-900">Decoded Fields</h2>
+            <div class="flex items-center space-x-3">
+              <span id="decode-meta" class="text-xs text-gray-400"></span>
+              <button onclick="copyDecodeJSON()" class="copy-btn text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600">Copy JSON</button>
+            </div>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th class="px-6 py-3">Field</th>
+                <th class="px-6 py-3">Value</th>
+                <th class="px-6 py-3">Hex</th>
+              </tr>
+            </thead>
+            <tbody id="decode-fields"></tbody>
+          </table>
+        </div>
+
+        <div id="decode-signature" class="hidden mt-4 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="font-semibold text-gray-900">PKCS#7 Signature</h2>
+          </div>
+          <div id="sig-details" class="px-6 py-4 text-sm space-y-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Encode Panel -->
+    <div id="panel-encode" class="hidden">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">User *</label>
+            <input id="enc-user" type="text" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="SAPUSER" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">System ID</label>
+            <input id="enc-sysid" type="text" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="PRD" maxlength="3" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Client</label>
+            <input id="enc-client" type="text" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="100" maxlength="3" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Validity</label>
+            <input id="enc-validity" type="datetime-local" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+
+        <details class="border border-gray-200 rounded-md">
+          <summary class="px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50">Signing (optional) — PEM Key &amp; Certificate</summary>
+          <div class="p-4 space-y-3 border-t border-gray-200">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Private Key (PEM)</label>
+              <textarea id="enc-key" rows="4" class="w-full border border-gray-300 rounded-md p-2 text-xs" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Certificate (PEM)</label>
+              <textarea id="enc-cert" rows="4" class="w-full border border-gray-300 rounded-md p-2 text-xs" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
+            </div>
+          </div>
+        </details>
+
+        <div class="flex items-center space-x-3">
+          <button onclick="doEncode()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">Encode Token</button>
+          <span class="text-xs text-gray-400"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> to submit</span>
+        </div>
+      </div>
+
+      <div id="encode-error" class="hidden mt-4 bg-red-50 border border-red-200 text-red-700 rounded-md p-4 text-sm"></div>
+
+      <div id="encode-result" class="hidden mt-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-semibold text-gray-900">Encoded Token</h2>
+            <div class="flex items-center space-x-2">
+              <button onclick="copyToken()" class="copy-btn text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-600">Copy</button>
+              <button onclick="decodeThis()" class="copy-btn text-xs px-3 py-1 bg-blue-50 hover:bg-blue-100 rounded-md text-blue-600">Decode This</button>
+            </div>
+          </div>
+          <textarea id="encode-output" rows="5" readonly class="w-full border border-gray-300 rounded-md p-3 bg-gray-50"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help Panel -->
+    <div id="panel-help" class="hidden">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 help-section">
+        <h3>What is MYSAPSSO2?</h3>
+        <p>
+          MYSAPSSO2 is an SAP SSO2 logon ticket — a cookie-based Single Sign-On token used by SAP systems.
+          When a user authenticates to an SAP system, the server issues a signed ticket stored as the
+          <code>MYSAPSSO2</code> browser cookie. Other SAP systems that trust the issuer's certificate can
+          accept the ticket for passwordless login.
+        </p>
+
+        <h3>Token Structure</h3>
+        <p>The token is a base64-encoded binary blob with this layout:</p>
+        <div class="overflow-x-auto mt-2">
+          <table class="w-full border border-gray-200 text-left">
+            <thead>
+              <tr class="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
+                <th class="px-4 py-2 border-b">Offset</th>
+                <th class="px-4 py-2 border-b">Content</th>
+              </tr>
+            </thead>
+            <tbody class="text-sm text-gray-700">
+              <tr class="border-b"><td class="px-4 py-2 font-mono">0</td><td class="px-4 py-2">Version byte (usually <code>0x02</code>)</td></tr>
+              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">1–4</td><td class="px-4 py-2">Codepage — 4 ASCII bytes (e.g. <code>4103</code>)</td></tr>
+              <tr class="border-b"><td class="px-4 py-2 font-mono">5…n</td><td class="px-4 py-2">TLV (Tag-Length-Value) fields — see table below</td></tr>
+              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">n+1</td><td class="px-4 py-2"><code>0xFF</code> end-of-fields marker</td></tr>
+              <tr class="border-b"><td class="px-4 py-2 font-mono">n+2…n+3</td><td class="px-4 py-2">Signature length — 2-byte big-endian uint16</td></tr>
+              <tr><td class="px-4 py-2 font-mono">n+4…</td><td class="px-4 py-2">PKCS#7 / CMS signature block (BER/DER encoded)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="mt-3">Common TLV fields:</p>
+        <div class="overflow-x-auto mt-1">
+          <table class="w-full border border-gray-200 text-left">
+            <thead>
+              <tr class="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
+                <th class="px-4 py-2 border-b">ID</th>
+                <th class="px-4 py-2 border-b">Name</th>
+                <th class="px-4 py-2 border-b">Encoding</th>
+              </tr>
+            </thead>
+            <tbody class="text-sm text-gray-700">
+              <tr class="border-b"><td class="px-4 py-2 font-mono">0x01</td><td class="px-4 py-2">User</td><td class="px-4 py-2">UTF-16LE text</td></tr>
+              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x02</td><td class="px-4 py-2">System ID (SysId)</td><td class="px-4 py-2">UTF-16LE text</td></tr>
+              <tr class="border-b"><td class="px-4 py-2 font-mono">0x03</td><td class="px-4 py-2">Client</td><td class="px-4 py-2">UTF-16LE text</td></tr>
+              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x04</td><td class="px-4 py-2">Validity (expiry)</td><td class="px-4 py-2">UTF-16LE <code>YYYYMMDDHHmmss</code></td></tr>
+              <tr class="border-b"><td class="px-4 py-2 font-mono">0x05</td><td class="px-4 py-2">Signature Flags</td><td class="px-4 py-2">Raw bytes (hex)</td></tr>
+              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x06</td><td class="px-4 py-2">Recipient Info</td><td class="px-4 py-2">UTF-16LE text</td></tr>
+              <tr><td class="px-4 py-2 font-mono">0x09</td><td class="px-4 py-2">Short Info</td><td class="px-4 py-2">UTF-16LE text</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>How to Use — Decode</h3>
+        <ul>
+          <li>Get the token from your browser cookies (look for <code>MYSAPSSO2</code>) or from an HTTP <code>Authorization</code> header.</li>
+          <li>Paste the base64 string into the Decode tab and click <strong>Decode Token</strong>.</li>
+          <li>Or click <strong>Load Example</strong> to generate a sample token and decode it instantly.</li>
+          <li>The decoded fields table shows each TLV field's label, value, and raw hex bytes.</li>
+          <li>If the token has a PKCS#7 signature, the issuer CN, serial number, digest algorithm, and signing time are shown below the fields. SAP typically uses BER indefinite-length encoding for the signature block.</li>
+        </ul>
+
+        <h3>How to Use — Encode</h3>
+        <ul>
+          <li><strong>User</strong> (required) — the SAP username to embed in the ticket.</li>
+          <li><strong>System ID</strong> — 3-character SAP system identifier (e.g. PRD, DEV).</li>
+          <li><strong>Client</strong> — 3-digit SAP client number (e.g. 100, 800).</li>
+          <li><strong>Validity</strong> — expiry date/time; use the datetime picker and it auto-formats to <code>YYYYMMDDHHmmss</code>.</li>
+          <li><strong>Signing</strong> — optionally provide a PEM private key and certificate to produce a PKCS#7-signed token.</li>
+          <li>Without signing, the token is structurally valid but <em>unsigned</em> — useful for testing and development.</li>
+          <li>After encoding, click <strong>Decode This</strong> to verify the token round-trips correctly.</li>
+        </ul>
+
+        <h3>Limitations &amp; Security Notes</h3>
+        <ul>
+          <li>Unsigned tokens will <strong>not</strong> be accepted by production SAP systems — they require a valid PKCS#7 signature from a trusted certificate.</li>
+          <li>When signing, the private key is sent to the server for processing. <strong>Only use this tool in trusted environments</strong> (localhost, internal network).</li>
+          <li>This tool is intended for development, testing, and educational purposes.</li>
+          <li>Never use real production private keys on untrusted servers.</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="mt-12 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
+      Built by vladimir.balko at <a href="https://www.claimate.tech" class="hover:text-gray-600 underline" target="_blank" rel="noopener">claimate.tech</a>
+    </footer>
+  </div>
+
+  <script>
+    let lastDecodeData = null;
+
+    function switchTab(tab) {
+      const tabs = ['decode', 'encode', 'help'];
+      tabs.forEach(t => {
+        document.getElementById(`tab-${t}`).className = `pb-2 px-1 text-sm ${t === tab ? 'tab-active' : 'tab-inactive'}`;
+        document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+      });
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1500);
+    }
+
+    async function loadExample() {
+      const input = document.getElementById('decode-input');
+      const errEl = document.getElementById('decode-error');
+      errEl.classList.add('hidden');
+      try {
+        const resp = await fetch('/api/encode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user: 'DEMOUSER', sysId: 'DEV', client: '100', validity: '20261231235959' }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed to generate example');
+        input.value = data.token;
+        showToast('Example token loaded');
+      } catch (e) {
+        showError(errEl, 'Could not generate example: ' + e.message);
+      }
+    }
+
+    async function doDecode() {
+      const token = document.getElementById('decode-input').value.trim();
+      const errEl = document.getElementById('decode-error');
+      const resEl = document.getElementById('decode-result');
+      errEl.classList.add('hidden');
+      resEl.classList.add('hidden');
+
+      if (!token) { showError(errEl, 'Please paste a token.'); return; }
+
+      try {
+        const resp = await fetch('/api/decode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Decode failed');
+        lastDecodeData = data;
+        renderDecode(data);
+        resEl.classList.remove('hidden');
+      } catch (e) {
+        showError(errEl, e.message);
+      }
+    }
+
+    function renderDecode(data) {
+      document.getElementById('decode-meta').textContent = `Version: ${data.version} | Codepage: ${data.codepage}`;
+
+      const tbody = document.getElementById('decode-fields');
+      tbody.innerHTML = '';
+      data.fields.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.className = 'field-row border-t border-gray-100';
+        tr.innerHTML = `
+          <td class="px-6 py-3 font-medium text-gray-900">${esc(f.label)} <span class="text-gray-400 text-xs">(${f.id})</span></td>
+          <td class="px-6 py-3 text-gray-700 break-all">${esc(f.value)}</td>
+          <td class="px-6 py-3 text-gray-400 text-xs font-mono break-all">${esc(f.hex)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const sigDiv = document.getElementById('decode-signature');
+      const sigDetails = document.getElementById('sig-details');
+      if (data.signature) {
+        sigDiv.classList.remove('hidden');
+        const sig = data.signature;
+        if (sig.parsed) {
+          sigDetails.innerHTML = [
+            row('Subject CN', sig.subjectCN),
+            row('Issuer CN', sig.issuerCN),
+            row('Serial', sig.serial),
+            row('Digest Algorithm', sig.digestAlgorithm),
+            row('Signing Time', sig.signingTime),
+            row('Valid From', sig.notBefore),
+            row('Valid To', sig.notAfter),
+          ].filter(Boolean).join('');
+        } else {
+          sigDetails.innerHTML = `<p class="text-yellow-600">Could not fully parse signature: ${esc(sig.error || 'unknown')}</p>
+            <p class="text-gray-400 text-xs mt-1">Signature block length: ${sig.length} bytes</p>`;
+        }
+      } else {
+        sigDiv.classList.add('hidden');
+      }
+    }
+
+    function row(label, value) {
+      if (!value) return '';
+      return `<div class="flex"><span class="w-40 text-gray-500 flex-shrink-0">${esc(label)}</span><span class="text-gray-900 break-all">${esc(String(value))}</span></div>`;
+    }
+
+    function getValidityString() {
+      const val = document.getElementById('enc-validity').value;
+      if (!val) return '';
+      const d = new Date(val);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    }
+
+    async function doEncode() {
+      const errEl = document.getElementById('encode-error');
+      const resEl = document.getElementById('encode-result');
+      errEl.classList.add('hidden');
+      resEl.classList.add('hidden');
+
+      const body = {
+        user: document.getElementById('enc-user').value.trim(),
+        sysId: document.getElementById('enc-sysid').value.trim(),
+        client: document.getElementById('enc-client').value.trim(),
+        validity: getValidityString(),
+        pemKey: document.getElementById('enc-key').value.trim() || undefined,
+        pemCert: document.getElementById('enc-cert').value.trim() || undefined,
+      };
+
+      if (!body.user) { showError(errEl, 'User is required.'); return; }
+
+      try {
+        const resp = await fetch('/api/encode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Encode failed');
+        document.getElementById('encode-output').value = data.token;
+        resEl.classList.remove('hidden');
+      } catch (e) {
+        showError(errEl, e.message);
+      }
+    }
+
+    function copyToken() {
+      const el = document.getElementById('encode-output');
+      navigator.clipboard.writeText(el.value);
+      showToast('Copied!');
+    }
+
+    function copyDecodeJSON() {
+      if (!lastDecodeData) return;
+      navigator.clipboard.writeText(JSON.stringify(lastDecodeData, null, 2));
+      showToast('Copied JSON!');
+    }
+
+    function decodeThis() {
+      const token = document.getElementById('encode-output').value.trim();
+      if (!token) return;
+      document.getElementById('decode-input').value = token;
+      switchTab('decode');
+      doDecode();
+    }
+
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Keyboard shortcut: Ctrl/Cmd+Enter to submit active tab's form
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (!document.getElementById('panel-decode').classList.contains('hidden')) {
+          doDecode();
+        } else if (!document.getElementById('panel-encode').classList.contains('hidden')) {
+          doEncode();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
