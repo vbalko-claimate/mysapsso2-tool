@@ -2,7 +2,7 @@
 
 Web-based tool for decoding and encoding SAP MYSAPSSO2 Single Sign-On logon tickets. Parses TLV fields, handles PKCS#7/CMS signature blocks (including SAP's BER indefinite-length encoding), and supports optional token signing with PEM keys.
 
-Built by [vladimir.balko@claimate.tech](mailto:vladimir.balko@claimate.tech) at [claimate.tech](https://www.claimate.tech).
+**Live demo:** [mysapsso2.app.claimate.tech](https://mysapsso2.app.claimate.tech)
 
 ## Features
 
@@ -156,3 +156,7 @@ MYSAPSSO2 tokens are base64-encoded binary blobs:
 ## License
 
 MIT
+
+---
+
+Created by vladimir.balko at [claimate.tech](https://www.claimate.tech)
