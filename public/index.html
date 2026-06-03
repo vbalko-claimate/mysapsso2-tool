@@ -37,8 +37,10 @@
 
   <div class="max-w-4xl mx-auto px-4 py-8">
     <header class="mb-8">
-      <h1 class="text-2xl font-bold text-gray-900">MYSAPSSO2 Token Tool</h1>
-      <p class="text-gray-500 mt-1">Decode and encode SAP SSO2 logon tickets</p>
+      <h1 class="text-2xl font-bold text-gray-900">MYSAPSSO2 Token Tool
+        <span class="ml-2 align-middle text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">v2 — enhanced</span>
+      </h1>
+      <p class="text-gray-500 mt-1">Decode and encode SAP SSO2 logon tickets — v2: corrected field semantics and SAP-verified signing, based on a real S/4HANA deployment</p>
     </header>
 
     <!-- Tabs -->
@@ -167,6 +169,13 @@
     <!-- Help Panel -->
     <div id="panel-help" class="hidden">
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 help-section">
+        <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 text-sm text-blue-900">
+          <strong>What's new in v2</strong> — corrections from a real S/4HANA deployment (kernel 7.93, CommonCryptoLib 8.5.x):
+          field 4 is the <em>creation</em> time (not expiry), System ID/Client identify the <em>issuer</em> (not the target),
+          signing now uses the SAP-accepted recipe (SHA-1 digest, detached, no authenticatedAttributes), and the decoder
+          warns about conditions that make SAP reject a ticket. See the
+          "Getting SAP to Accept Your Token" section below.
+        </div>
         <h3>What is MYSAPSSO2?</h3>
         <p>
           MYSAPSSO2 is an SAP SSO2 logon ticket — a cookie-based Single Sign-On token used by SAP systems.

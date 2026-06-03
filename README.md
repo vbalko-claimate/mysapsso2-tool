@@ -4,6 +4,8 @@ Web-based tool for decoding and encoding SAP MYSAPSSO2 Single Sign-On logon tick
 
 **Live demo:** [mysapsso2.app.claimate.tech](https://mysapsso2.app.claimate.tech)
 
+> **v2 — enhanced.** This version incorporates corrections from a real production deployment against S/4HANA (kernel 7.93, CommonCryptoLib 8.5.x): field 4 is the ticket **creation** time (not an expiry), System ID/Client identify the **issuer** (not the target system), token signing uses the SAP-accepted recipe (SHA-1 digest, detached signature, no authenticatedAttributes), and the decoder warns about conditions that make SAP silently reject a ticket. See [SAP Acceptance Requirements](#sap-acceptance-requirements).
+
 ## Features
 
 - **Decode** — paste a base64-encoded MYSAPSSO2 cookie and instantly see all fields (user, issuer system ID, issuer client, creation time, signature flags, etc.) with raw hex
