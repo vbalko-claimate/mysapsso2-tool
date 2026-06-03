@@ -33,7 +33,10 @@ app.post('/api/decode', (req, res) => {
 // Encode endpoint
 app.post('/api/encode', (req, res) => {
   try {
-    const { user, sysId, client, validity, pemKey, pemCert } = req.body;
+    const { user, sysId, client, pemKey, pemCert } = req.body;
+    // "validity" is a deprecated alias kept for backwards compatibility —
+    // field 4 is the token CREATION time, not an expiry
+    const creationTime = req.body.creationTime || req.body.validity;
     if (!user || typeof user !== 'string') {
       return res.status(400).json({ error: 'Missing "user" field' });
     }
@@ -46,10 +49,10 @@ app.post('/api/encode', (req, res) => {
     if (client && (typeof client !== 'string' || !/^\d{1,3}$/.test(client))) {
       return res.status(400).json({ error: 'Client must be 1-3 digits' });
     }
-    if (validity && (typeof validity !== 'string' || !/^\d{14}$/.test(validity))) {
-      return res.status(400).json({ error: 'Validity must be 14 digits (YYYYMMDDHHmmss)' });
+    if (creationTime && (typeof creationTime !== 'string' || !/^\d{14}$/.test(creationTime))) {
+      return res.status(400).json({ error: 'Creation time must be 14 digits (YYYYMMDDHHmmss, UTC)' });
     }
-    const token = encode({ user, sysId, client, validity, pemKey, pemCert });
+    const token = encode({ user, sysId, client, creationTime, pemKey, pemCert });
     res.json({ token });
   } catch (e) {
     res.status(400).json({ error: e.message });

@@ -62,6 +62,11 @@
 
       <div id="decode-error" class="hidden mt-4 bg-red-50 border border-red-200 text-red-700 rounded-md p-4 text-sm"></div>
 
+      <div id="decode-warnings" class="hidden mt-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 text-sm">
+        <div class="font-semibold mb-1">⚠️ SAP acceptance warnings</div>
+        <ul id="decode-warnings-list" class="list-disc pl-5 space-y-1"></ul>
+      </div>
+
       <div id="decode-result" class="hidden mt-6">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -101,22 +106,31 @@
             <input id="enc-user" type="text" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="SAPUSER" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">System ID</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">System ID <span class="text-gray-400 font-normal">(issuer)</span></label>
             <input id="enc-sysid" type="text" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="PRD" maxlength="3" />
+            <p class="text-xs text-gray-400 mt-1">Identifies the token issuer, not the target system</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Client</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Client <span class="text-gray-400 font-normal">(issuer)</span></label>
             <input id="enc-client" type="text" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="100" maxlength="3" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Validity</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Creation Time</label>
             <input id="enc-validity" type="datetime-local" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500" />
+            <p class="text-xs text-gray-400 mt-1">When the token was created (defaults to now) — <em>not</em> an expiry. SAP rejects future timestamps and adds its own validity period.</p>
           </div>
         </div>
 
         <details class="border border-gray-200 rounded-md">
           <summary class="px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50">Signing (optional) — PEM Key &amp; Certificate</summary>
           <div class="p-4 space-y-3 border-t border-gray-200">
+            <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+              For SAP to accept the token, the certificate must be <strong>SHA-1-signed</strong>
+              (<code>openssl req -sha1 …</code>). SHA-256-signed certificates import into STRUSTSSO2
+              without error but fail verification (<code>SsfVerify returned 5</code>).
+              Tokens are signed with SHA-1 digest, detached, without authenticatedAttributes —
+              the combination verified against S/4HANA with CommonCryptoLib 8.x.
+            </p>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Private Key (PEM)</label>
               <textarea id="enc-key" rows="4" class="w-full border border-gray-300 rounded-md p-2 text-xs" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
@@ -194,9 +208,9 @@
             </thead>
             <tbody class="text-sm text-gray-700">
               <tr class="border-b"><td class="px-4 py-2 font-mono">0x01</td><td class="px-4 py-2">User</td><td class="px-4 py-2">UTF-16LE text</td></tr>
-              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x02</td><td class="px-4 py-2">System ID (SysId)</td><td class="px-4 py-2">UTF-16LE text</td></tr>
-              <tr class="border-b"><td class="px-4 py-2 font-mono">0x03</td><td class="px-4 py-2">Client</td><td class="px-4 py-2">UTF-16LE text</td></tr>
-              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x04</td><td class="px-4 py-2">Validity (expiry)</td><td class="px-4 py-2">UTF-16LE <code>YYYYMMDDHHmmss</code></td></tr>
+              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x02</td><td class="px-4 py-2">System ID — <strong>issuer</strong>, not target</td><td class="px-4 py-2">UTF-16LE text</td></tr>
+              <tr class="border-b"><td class="px-4 py-2 font-mono">0x03</td><td class="px-4 py-2">Client — <strong>issuer</strong>, not target</td><td class="px-4 py-2">UTF-16LE text</td></tr>
+              <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x04</td><td class="px-4 py-2">Creation time (<strong>not</strong> expiry — SAP adds its own validity period)</td><td class="px-4 py-2">UTF-16LE <code>YYYYMMDDHHmmss</code> UTC</td></tr>
               <tr class="border-b"><td class="px-4 py-2 font-mono">0x05</td><td class="px-4 py-2">Signature Flags</td><td class="px-4 py-2">Raw bytes (hex)</td></tr>
               <tr class="border-b bg-gray-50"><td class="px-4 py-2 font-mono">0x06</td><td class="px-4 py-2">Recipient Info</td><td class="px-4 py-2">UTF-16LE text</td></tr>
               <tr><td class="px-4 py-2 font-mono">0x09</td><td class="px-4 py-2">Short Info</td><td class="px-4 py-2">UTF-16LE text</td></tr>
@@ -216,12 +230,28 @@
         <h3>How to Use — Encode</h3>
         <ul>
           <li><strong>User</strong> (required) — the SAP username to embed in the ticket.</li>
-          <li><strong>System ID</strong> — 3-character SAP system identifier (e.g. PRD, DEV).</li>
-          <li><strong>Client</strong> — 3-digit SAP client number (e.g. 100, 800).</li>
-          <li><strong>Validity</strong> — expiry date/time; use the datetime picker and it auto-formats to <code>YYYYMMDDHHmmss</code>.</li>
-          <li><strong>Signing</strong> — optionally provide a PEM private key and certificate to produce a PKCS#7-signed token.</li>
+          <li><strong>System ID</strong> — 3-character identifier of the <em>issuing</em> system (your application). The target SAP system never appears in the token; the issuer values must match the ACL entry in the target's <code>STRUSTSSO2</code>.</li>
+          <li><strong>Client</strong> — 3-digit client of the <em>issuing</em> system.</li>
+          <li><strong>Creation Time</strong> — when the token is created (defaults to now), auto-formatted to <code>YYYYMMDDHHmmss</code> UTC. This is <em>not</em> an expiry — SAP computes expiration as creation time + <code>login/ticket_expiration_time</code> (default 8h) and <em>rejects</em> tokens with a future creation date.</li>
+          <li><strong>Signing</strong> — optionally provide a PEM private key and certificate to produce a PKCS#7-signed token. The certificate must be SHA-1-signed for SAP to verify it.</li>
           <li>Without signing, the token is structurally valid but <em>unsigned</em> — useful for testing and development.</li>
           <li>After encoding, click <strong>Decode This</strong> to verify the token round-trips correctly.</li>
+        </ul>
+
+        <h3>Getting SAP to Accept Your Token</h3>
+        <p>
+          Hard-won requirements from a real S/4HANA deployment (kernel 7.93, CommonCryptoLib 8.5.x).
+          All of these fail <em>silently at import time</em> and only show up in kernel traces:
+        </p>
+        <ul>
+          <li><strong>SHA-1-signed certificate</strong> — generate with <code>openssl req -sha1 …</code>. A <code>sha256WithRSAEncryption</code> certificate imports into <code>STRUSTSSO2</code> fine but verification fails with <code>SsfVerify returned 5</code>.</li>
+          <li><strong>No authenticatedAttributes</strong> in the PKCS#7 signature — with RSA keys, CommonCryptoLib cannot verify signatures computed over authenticated attributes (<code>SSF_API_SIGNER_ERRORS</code>). This tool signs without them.</li>
+          <li><strong>SHA-1 digest</strong> — SAP expects <code>Alg=SHA1</code>; SHA-256 digests are rejected. DSA 1024 + SHA-1 works on all NetWeaver versions; RSA 2048 + SHA-1 works on CommonCryptoLib 8.x.</li>
+          <li><strong>Creation time, not expiry, in field 4</strong> — a future timestamp triggers <code>invalid format: ticket creation date</code> / <code>HMskiCheckValidity failed</code>.</li>
+          <li><strong><code>RZ11</code>:</strong> <code>login/accept_sso2_ticket = 1</code> on the accepting system.</li>
+          <li><strong><code>STRUSTSSO2</code> is client-dependent</strong> — import the certificate into the Certificate List in client 000, but add the ACL entry (issuer System ID + Client from the token) <em>in the client users log into</em>. The ACL table is <code>TWPSSO2ACL</code> (check via <code>SM30</code>). Missing entry: <code>No entry in TWPSSO2ACL for SYS … and CLI …</code>.</li>
+          <li><strong>ICM soft restart</strong> after STRUSTSSO2 changes — <code>SMICM → Administration → ICM → Exit Soft → Local</code> (SAP Note 510007).</li>
+          <li><strong>HTTP port in BTP destinations</strong> — point the destination at the backend's HTTP port (e.g. 8000), not the HTTPS port. If the <code>sap-ssolist</code> response header lacks <code>r=</code> entries, SSO ticket auth isn't active on that endpoint.</li>
         </ul>
 
         <h3>Limitations &amp; Security Notes</h3>
@@ -267,7 +297,7 @@
         const resp = await fetch('/api/encode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user: 'DEMOUSER', sysId: 'DEV', client: '100', validity: '20261231235959' }),
+          body: JSON.stringify({ user: 'DEMOUSER', sysId: 'DEV', client: '100' }),
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || 'Failed to generate example');
@@ -306,6 +336,20 @@
     function renderDecode(data) {
       document.getElementById('decode-meta').textContent = `Version: ${data.version} | Codepage: ${data.codepage}`;
 
+      const warnDiv = document.getElementById('decode-warnings');
+      const warnList = document.getElementById('decode-warnings-list');
+      warnList.innerHTML = '';
+      if (data.warnings && data.warnings.length > 0) {
+        data.warnings.forEach(w => {
+          const li = document.createElement('li');
+          li.textContent = w;
+          warnList.appendChild(li);
+        });
+        warnDiv.classList.remove('hidden');
+      } else {
+        warnDiv.classList.add('hidden');
+      }
+
       const tbody = document.getElementById('decode-fields');
       tbody.innerHTML = '';
       data.fields.forEach(f => {
@@ -330,6 +374,8 @@
             row('Issuer CN', sig.issuerCN),
             row('Serial', sig.serial),
             row('Digest Algorithm', sig.digestAlgorithm),
+            row('Cert Signature Alg', sig.certSignatureAlgorithm),
+            row('Auth. Attributes', sig.hasAuthenticatedAttributes ? 'present' : ''),
             row('Signing Time', sig.signingTime),
             row('Valid From', sig.notBefore),
             row('Valid To', sig.notAfter),
@@ -348,13 +394,23 @@
       return `<div class="flex"><span class="w-40 text-gray-500 flex-shrink-0">${esc(label)}</span><span class="text-gray-900 break-all">${esc(String(value))}</span></div>`;
     }
 
-    function getValidityString() {
+    function getCreationTimeString() {
       const val = document.getElementById('enc-validity').value;
       if (!val) return '';
+      // The picker shows local time; the token timestamp must be UTC
       const d = new Date(val);
       const pad = n => String(n).padStart(2, '0');
-      return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+      return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
     }
+
+    // Default the creation-time picker to "now" — field 4 is the token
+    // creation date; SAP rejects future timestamps
+    (function initCreationTime() {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('enc-validity').value =
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    })();
 
     async function doEncode() {
       const errEl = document.getElementById('encode-error');
@@ -366,7 +422,7 @@
         user: document.getElementById('enc-user').value.trim(),
         sysId: document.getElementById('enc-sysid').value.trim(),
         client: document.getElementById('enc-client').value.trim(),
-        validity: getValidityString(),
+        creationTime: getCreationTimeString(),
         pemKey: document.getElementById('enc-key').value.trim() || undefined,
         pemCert: document.getElementById('enc-cert').value.trim() || undefined,
       };

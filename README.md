@@ -6,13 +6,14 @@ Web-based tool for decoding and encoding SAP MYSAPSSO2 Single Sign-On logon tick
 
 ## Features
 
-- **Decode** — paste a base64-encoded MYSAPSSO2 cookie and instantly see all fields (user, system ID, client, validity, signature flags, etc.) with raw hex
-- **Encode** — build tokens from field values, optionally sign with a PEM private key and certificate
-- **PKCS#7 signature parsing** — extracts issuer CN, serial number, digest algorithm, and signing time from SAP's BER-encoded CMS signatures
+- **Decode** — paste a base64-encoded MYSAPSSO2 cookie and instantly see all fields (user, issuer system ID, issuer client, creation time, signature flags, etc.) with raw hex
+- **Encode** — build tokens from field values, optionally sign with a PEM private key and certificate (SHA-1 digest, detached, no authenticatedAttributes — the combination verified against S/4HANA with CommonCryptoLib 8.x)
+- **PKCS#7 signature parsing** — extracts issuer CN, serial number, digest algorithm, certificate signature algorithm, and signing time from SAP's BER-encoded CMS signatures
+- **SAP acceptance warnings** — the decoder flags conditions that make SAP reject the ticket at verification time: SHA-256-signed certificates (`SsfVerify returned 5`), non-SHA-1 digests, authenticatedAttributes with RSA, and future creation timestamps (`HMskiCheckValidity failed`)
 - **Load Example** — one-click demo token generation for quick exploration
 - **Round-trip verification** — encode a token, then click "Decode This" to verify it
 - **Copy JSON** — export full decoded results to clipboard
-- **Datetime picker** — validity field auto-formats to SAP's `YYYYMMDDHHmmss` format
+- **Datetime picker** — creation-time field auto-formats to SAP's `YYYYMMDDHHmmss` UTC format
 - **Keyboard shortcut** — `Ctrl/Cmd+Enter` to submit the active form
 - **Help tab** — built-in documentation covering token structure, TLV field reference, and usage guidance
 - **Docker ready** — multi-stage Dockerfile with health checks
@@ -72,15 +73,18 @@ Decode a base64 MYSAPSSO2 token.
     }
   ],
   "signature": {
-    "issuerCN": "Prometheus Group Auth Service",
+    "issuerCN": "my-btp-token-issuer",
     "serial": "673a2e932e331f30",
     "digestAlgorithm": "sha1",
-    "signingTime": "260209164214Z",
+    "certSignatureAlgorithm": "sha1WithRSAEncryption",
     "parsed": true,
     "length": 544
-  }
+  },
+  "warnings": []
 }
 ```
+
+`warnings` lists conditions that make SAP reject the ticket even though it decodes fine (wrong certificate signature algorithm, non-SHA-1 digest, authenticatedAttributes with RSA, future creation timestamp).
 
 ### `POST /api/encode`
 
@@ -93,13 +97,15 @@ Encode a new MYSAPSSO2 token.
   "user": "SAPUSER",
   "sysId": "PRD",
   "client": "100",
-  "validity": "20261231235959",
+  "creationTime": "20260603120000",
   "pemKey": "-----BEGIN RSA PRIVATE KEY-----\n...",
   "pemCert": "-----BEGIN CERTIFICATE-----\n..."
 }
 ```
 
-`pemKey` and `pemCert` are optional. Without them, the token is unsigned.
+- `sysId` / `client` identify the **issuer** of the token (your application), not the target SAP system. They must match the ACL entry in the target's `STRUSTSSO2`.
+- `creationTime` is the token **creation** timestamp (UTC, `YYYYMMDDHHmmss`), defaulting to now. It is *not* an expiry — SAP computes expiration as creation time + `login/ticket_expiration_time` and rejects future creation dates. (`validity` is accepted as a deprecated alias.)
+- `pemKey` and `pemCert` are optional. Without them, the token is unsigned. The certificate must be **SHA-1-signed** for SAP to verify the ticket; tokens are signed with SHA-1 digest, detached, without authenticatedAttributes.
 
 **Response:**
 
@@ -131,12 +137,25 @@ MYSAPSSO2 tokens are base64-encoded binary blobs:
 | ID | Name | Encoding |
 |----|------|----------|
 | `0x01` | User | UTF-16LE |
-| `0x02` | System ID | UTF-16LE |
-| `0x03` | Client | UTF-16LE |
-| `0x04` | Validity (expiry) | UTF-16LE `YYYYMMDDHHmmss` |
+| `0x02` | System ID (**issuer**, not target) | UTF-16LE |
+| `0x03` | Client (**issuer**, not target) | UTF-16LE |
+| `0x04` | Creation time (**not** expiry — SAP adds its own validity period) | UTF-16LE `YYYYMMDDHHmmss` UTC |
 | `0x05` | Signature Flags | Raw bytes |
 | `0x06` | Recipient Info | UTF-16LE |
 | `0x09` | Short Info | UTF-16LE |
+
+## SAP Acceptance Requirements
+
+Decoding a token tells you what's inside it; getting SAP to *accept* it is another story. These requirements were verified against a production S/4HANA (kernel 7.93, CommonCryptoLib 8.5.x) — all of them fail silently at import time and only surface in kernel traces:
+
+- **SHA-1-signed certificate** — `openssl req -sha1 …`. A `sha256WithRSAEncryption` certificate imports into `STRUSTSSO2` without error but fails verification (`SsfVerify returned 5`).
+- **SHA-1 digest, no authenticatedAttributes, detached signature** — with RSA keys, CommonCryptoLib cannot verify PKCS#7 signatures computed over authenticated attributes. DSA 1024 + SHA-1 works on all NetWeaver versions; RSA 2048 + SHA-1 works on CommonCryptoLib 8.x.
+- **Creation time in field 4** — a future timestamp is rejected (`invalid format: ticket creation date` / `HMskiCheckValidity failed`).
+- **`login/accept_sso2_ticket = 1`** on the accepting system (`RZ11`).
+- **`STRUSTSSO2` is client-dependent** — certificate into the Certificate List in client 000, ACL entry (issuer System ID + Client) in the client users log into. ACL table: `TWPSSO2ACL`.
+- **ICM soft restart** after `STRUSTSSO2` changes (`SMICM`, SAP Note 510007).
+
+The tool's decoder warns about the first three automatically.
 
 ## Tech Stack
 

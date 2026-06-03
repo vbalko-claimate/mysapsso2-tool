@@ -1,1 +1,5 @@
 node_modules/
+.DS_Store
+
+# Local drafts — contains customer-specific deployment details
+blog/
